@@ -220,8 +220,9 @@ with col4:
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ------------- Tabs --------------
-tab1, tab3, tab4, tab5 = st.tabs([
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📊 Topic Map", 
+    "☁️ Word Cloud", 
     "📈 Sentiment Trend", 
     "🔍 Topic Breakdown",
     "📝 Post Explorer"
@@ -269,64 +270,64 @@ with tab1:
     else:
         st.info("t‑SNE coordinates were not found in the dataset.")
 
-# with tab2:
-#     st.markdown("<h3 class='sub-header'>Word Cloud Visualization</h3>", unsafe_allow_html=True)
-#     st.markdown("""
-#     This word cloud displays the most frequent terms in the selected posts, 
-#     with size indicating frequency. Common stopwords and noise are removed.
-#     """)
+with tab2:
+    st.markdown("<h3 class='sub-header'>Word Cloud Visualization</h3>", unsafe_allow_html=True)
+    st.markdown("""
+    This word cloud displays the most frequent terms in the selected posts, 
+    with size indicating frequency. Common stopwords and noise are removed.
+    """)
     
-#     # Combine text
-#     topic_text = " ".join(df_filtered["text"].dropna().astype(str))
+    # Combine text
+    topic_text = " ".join(df_filtered["text"].dropna().astype(str))
     
-#     if topic_text.strip():
-#         # Clean
-#         def clean_for_wc(t):
-#             t = re.sub(r'https?://\\S+', '', t)
-#             t = re.sub(r'@\\S+', '', t)
-#             t = re.sub(r'[^\\w\\s#]', ' ', t)
-#             return t.lower()
+    if topic_text.strip():
+        # Clean
+        def clean_for_wc(t):
+            t = re.sub(r'https?://\\S+', '', t)
+            t = re.sub(r'@\\S+', '', t)
+            t = re.sub(r'[^\\w\\s#]', ' ', t)
+            return t.lower()
         
-#         tokens = clean_for_wc(topic_text).split()
-#         tokens = [tok for tok in tokens if tok.isalpha() and len(tok) > 2]
-#         freqs = Counter(tokens)
+        tokens = clean_for_wc(topic_text).split()
+        tokens = [tok for tok in tokens if tok.isalpha() and len(tok) > 2]
+        freqs = Counter(tokens)
         
-#         if freqs:
-#             col1, col2 = st.columns([3, 1])
+        if freqs:
+            col1, col2 = st.columns([3, 1])
             
-#             with col1:
-#                 # Create word cloud with current theme settings
-#                 wc = WordCloud(
-#                     width=800, height=400,
-#                     background_color=bg_color,
-#                     max_words=150,
-#                     colormap=color_scheme.lower(),
-#                     contour_width=1,
-#                     contour_color='lightgrey' if theme_mode == "Light" else 'darkgrey'
-#                 ).generate_from_frequencies(freqs)
+            with col1:
+                # Create word cloud with current theme settings
+                wc = WordCloud(
+                    width=800, height=400,
+                    background_color=bg_color,
+                    max_words=150,
+                    colormap=color_scheme.lower(),
+                    contour_width=1,
+                    contour_color='lightgrey' if theme_mode == "Light" else 'darkgrey'
+                ).generate_from_frequencies(freqs)
                 
-#                 fig, ax = plt.subplots(figsize=(10, 5))
-#                 ax.imshow(wc, interpolation='bilinear')
-#                 ax.axis('off')
-#                 st.pyplot(fig)
+                fig, ax = plt.subplots(figsize=(10, 5))
+                ax.imshow(wc, interpolation='bilinear')
+                ax.axis('off')
+                st.pyplot(fig)
             
-#             with col2:
-#                 # Show top terms as a bar chart
-#                 top_terms = pd.DataFrame(freqs.most_common(15), columns=['Term', 'Count'])
-#                 fig = px.bar(
-#                     top_terms, 
-#                     x='Count', 
-#                     y='Term',
-#                     orientation='h',
-#                     template=chart_template,
-#                     title='Top 15 Terms'
-#                 )
-#                 fig.update_layout(yaxis={'categoryorder':'total ascending'})
-#                 st.plotly_chart(fig, use_container_width=True)
-#         else:
-#             st.info("No valid words available for word‑cloud generation.")
-#     else:
-#         st.info("No text data available for word‑cloud generation.")
+            with col2:
+                # Show top terms as a bar chart
+                top_terms = pd.DataFrame(freqs.most_common(15), columns=['Term', 'Count'])
+                fig = px.bar(
+                    top_terms, 
+                    x='Count', 
+                    y='Term',
+                    orientation='h',
+                    template=chart_template,
+                    title='Top 15 Terms'
+                )
+                fig.update_layout(yaxis={'categoryorder':'total ascending'})
+                st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No valid words available for word‑cloud generation.")
+    else:
+        st.info("No text data available for word‑cloud generation.")
 
 with tab3:
     st.markdown("<h3 class='sub-header'>Sentiment & Volume Over Time</h3>", unsafe_allow_html=True)
