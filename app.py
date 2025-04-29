@@ -153,7 +153,7 @@ df_filtered = df.copy()
 # Date filter
 if len(date_range) == 2:
     start_date, end_date = date_range
-    mask = (pd.to_datetime(df_filtered["date"]) >= pd.to_datetime(start_date)) & (pd.to_datetime(df_filtered["date"]) <= pd.to_datetime(end_date))
+    mask = (df_filtered["date"] >= start_date) & (df_filtered["date"] <= end_date)
     df_filtered = df_filtered[mask]
 
 # Topic filter
