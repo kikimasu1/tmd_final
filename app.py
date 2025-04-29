@@ -123,17 +123,15 @@ if selected_topic_with_count != "All":
 else:
     selected_topic = "All"
 
-# ---------- Date range with fixed bounds ----------
-# 手动指定起止日期
-min_date = datetime(2023, 6, 28).date()
-max_date = datetime(2025, 4, 24).date()
-
+# Date range with min/max display
+min_date = pd.to_datetime(df["date"]).min().date()
+max_date = pd.to_datetime(df["date"]).max().date()
 st.sidebar.markdown(f"📅 Date range (from {min_date} to {max_date})")
 date_range = st.sidebar.date_input(
     "Select date range:",
-    value=[min_date, max_date],     # 默认选中全区间
+    [min_date, max_date],
     min_value=min_date,
-    max_value=max_date,
+    max_value=max_date
 )
 
 # Sentiment range slider
@@ -153,7 +151,7 @@ df_filtered = df.copy()
 # Date filter
 if len(date_range) == 2:
     start_date, end_date = date_range
-    mask = (df_filtered["date"] >= start_date) & (df_filtered["date"] <= end_date)
+    mask = (pd.to_datetime(df_filtered["date"]) >= pd.to_datetime(start_date)) & (pd.to_datetime(df_filtered["date"]) <= pd.to_datetime(end_date))
     df_filtered = df_filtered[mask]
 
 # Topic filter
@@ -162,6 +160,8 @@ if selected_topic != "All":
 
 # Sentiment filter
 df_filtered = df_filtered[df_filtered["sentiment"].between(sentiment_range[0], sentiment_range[1])]
+
+
 
 # Hashtag selector (after topic/date/sentiment filtering)
 all_hashtags = list(chain.from_iterable(df_filtered["hashtags"].dropna()))
