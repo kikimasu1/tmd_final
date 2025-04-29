@@ -1,1 +1,11 @@
-This is for tmd final 
+# Bluesky Topic Modeling Web App
+
+This app uses LDA + t-SNE to analyze Bluesky posts, providing topic clusters and sentiment insights.
+
+🌀 Built with Streamlit  
+📊 Topic modeling: sklearn LDA  
+😊 Sentiment: TextBlob  
+📍 Visualization: Plotly
+
+## Try it live:
+Once deployed via Streamlit Cloud, anyone can interact with the analysis online.
