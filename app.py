@@ -12,7 +12,15 @@ from itertools import chain
 import time
 import base64
 import io
+import nltk
 
+# ---- make sure NLTK "stopwords" corpus is present ----
+try:
+    from nltk.corpus import stopwords
+    _ = stopwords.words("english")          # quick test-load
+except LookupError:
+    nltk.download("stopwords", quiet=True)
+    from nltk.corpus import stopwords
 # Set page configuration
 st.set_page_config(
     page_title="Bluesky Topic & Sentiment Explorer",
@@ -115,15 +123,17 @@ if selected_topic_with_count != "All":
 else:
     selected_topic = "All"
 
-# Date range with min/max display
-min_date = pd.to_datetime(df["date"]).min().date()
-max_date = pd.to_datetime(df["date"]).max().date()
+# ---------- Date range with fixed bounds ----------
+# 手动指定起止日期
+min_date = datetime(2023, 6, 28).date()
+max_date = datetime(2025, 4, 24).date()
+
 st.sidebar.markdown(f"📅 Date range (from {min_date} to {max_date})")
 date_range = st.sidebar.date_input(
     "Select date range:",
-    [min_date, max_date],
+    value=[min_date, max_date],     # 默认选中全区间
     min_value=min_date,
-    max_value=max_date
+    max_value=max_date,
 )
 
 # Sentiment range slider
@@ -270,64 +280,79 @@ with tab1:
     else:
         st.info("t‑SNE coordinates were not found in the dataset.")
 
+# ---------- Word-Cloud (TF-IDF weighted) ----------
 with tab2:
-    st.markdown("<h3 class='sub-header'>Word Cloud Visualization</h3>", unsafe_allow_html=True)
-    st.markdown("""
-    This word cloud displays the most frequent terms in the selected posts, 
-    with size indicating frequency. Common stopwords and noise are removed.
-    """)
-    
-    # Combine text
-    topic_text = " ".join(df_filtered["text"].dropna().astype(str))
-    
-    if topic_text.strip():
-        # Clean
-        def clean_for_wc(t):
-            t = re.sub(r'https?://\\S+', '', t)
-            t = re.sub(r'@\\S+', '', t)
-            t = re.sub(r'[^\\w\\s#]', ' ', t)
-            return t.lower()
-        
-        tokens = clean_for_wc(topic_text).split()
-        tokens = [tok for tok in tokens if tok.isalpha() and len(tok) > 2]
-        freqs = Counter(tokens)
-        
-        if freqs:
-            col1, col2 = st.columns([3, 1])
-            
-            with col1:
-                # Create word cloud with current theme settings
-                wc = WordCloud(
-                    width=800, height=400,
-                    background_color=bg_color,
-                    max_words=150,
-                    colormap=color_scheme.lower(),
-                    contour_width=1,
-                    contour_color='lightgrey' if theme_mode == "Light" else 'darkgrey'
-                ).generate_from_frequencies(freqs)
-                
-                fig, ax = plt.subplots(figsize=(10, 5))
-                ax.imshow(wc, interpolation='bilinear')
-                ax.axis('off')
-                st.pyplot(fig)
-            
-            with col2:
-                # Show top terms as a bar chart
-                top_terms = pd.DataFrame(freqs.most_common(15), columns=['Term', 'Count'])
-                fig = px.bar(
-                    top_terms, 
-                    x='Count', 
-                    y='Term',
-                    orientation='h',
-                    template=chart_template,
-                    title='Top 15 Terms'
-                )
-                fig.update_layout(yaxis={'categoryorder':'total ascending'})
-                st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("No valid words available for word‑cloud generation.")
-    else:
-        st.info("No text data available for word‑cloud generation.")
+    st.markdown("<h3 class='sub-header'>Word Cloud (TF-IDF-weighted)</h3>", unsafe_allow_html=True)
+    st.markdown("The cloud emphasises terms that are both frequent **and** unusually specific to the selected posts.")
+
+    # combine text
+    corpus = df_filtered["text"].dropna().astype(str).tolist()
+    if not corpus:
+        st.info("No text data available for word-cloud generation.");  st.stop()
+
+    import nltk, string, emoji
+    from nltk.stem import WordNetLemmatizer
+    from nltk.corpus import stopwords
+    from sklearn.feature_extraction.text import TfidfVectorizer
+
+    nltk.download("wordnet", quiet=True)
+    nltk.download("punkt", quiet=True)
+    nltk.download("averaged_perceptron_tagger", quiet=True)
+
+    EN_STOP = set(stopwords.words("english"))
+    BS_STOP = {"bluesky", "bsky", "post", "posts", "just", "like", "get", "got", "really",
+               "time", "day", "today", "now", "see", "think", "new"}   # tweak as you wish
+    STOPWORDS = EN_STOP | BS_STOP
+
+    lemmatizer = WordNetLemmatizer()
+    tok_re = re.compile(r"[a-z]{3,}")
+
+    def norm(text: str) -> str:
+        """lower-case, strip URLs/emojis/punctuation, lemmatise, drop stop-words."""
+        text = emoji.replace_emoji(text, replace="")
+        text = re.sub(r"https?://\\S+", "", text.lower())                # URLs
+        text = re.sub(r"@[\\w_]+", "", text)                             # mentions
+        text = text.translate(str.maketrans("", "", string.punctuation))
+        words = tok_re.findall(text)
+        lemmas = [lemmatizer.lemmatize(w) for w in words if w not in STOPWORDS]
+        return " ".join(lemmas)
+
+    docs = [norm(t) for t in corpus]
+
+    # TF-IDF weighting – treat hashtags as separate tokens with double weight
+    def tokenize(text):
+        tags = [h[1:] for h in re.findall(r"#(\\w+)", text)]
+        base = text.split()
+        return base + tags  # tags duplicated → double weight
+
+    vectorizer = TfidfVectorizer(tokenizer=tokenize, lowercase=False, min_df=2, max_df=0.7)
+    tfidf = vectorizer.fit_transform(docs)
+    terms = vectorizer.get_feature_names_out()
+    weights = tfidf.sum(axis=0).A1
+    freq_dict = {t: w for t, w in zip(terms, weights) if t not in STOPWORDS and len(t) > 2}
+
+    if not freq_dict:
+        st.info("Nothing after cleaning – try relaxing filters.");  st.stop()
+
+    # --- show alongside top list ---------------------------------
+    col_wc, col_bar = st.columns([3, 1])
+    with col_wc:
+        wc = WordCloud(width=800, height=400,
+                       background_color=bg_color,
+                       colormap=color_scheme.lower(),
+                       max_words=150).generate_from_frequencies(freq_dict)
+        fig, ax = plt.subplots(figsize=(10, 5))
+        ax.imshow(wc, interpolation="bilinear")
+        ax.axis("off")
+        st.pyplot(fig)
+
+    with col_bar:
+        top_df = (pd.Series(freq_dict)
+                    .sort_values(ascending=False)
+                    .head(25)
+                    .reset_index()
+                    .rename(columns={"index": "Term", 0: "Weight"}))
+        st.dataframe(top_df, height=450)
 
 with tab3:
     st.markdown("<h3 class='sub-header'>Sentiment & Volume Over Time</h3>", unsafe_allow_html=True)
