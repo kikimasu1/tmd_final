@@ -9,3 +9,9 @@ This app uses LDA + t-SNE to analyze Bluesky posts, providing topic clusters and
 
 ## Try it live:
 Once deployed via Streamlit Cloud, anyone can interact with the analysis online.
+
+1. pip install -r requirements.txt
+
+2. python bluesky_lda_pipeline.py
+
+3. streamlit run app.py
